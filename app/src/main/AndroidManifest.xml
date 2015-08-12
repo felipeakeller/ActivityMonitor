@@ -17,6 +17,7 @@
             </intent-filter>
         </activity>
         <service android:enabled="true" android:name=".service.MyService"/>
+        <service android:enabled="true" android:name=".service.BackgroundService"/>
     </application>
 
 </manifest>
