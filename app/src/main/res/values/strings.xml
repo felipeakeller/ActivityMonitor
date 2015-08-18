@@ -1,6 +1,8 @@
 <resources>
-    <string name="app_name">ActivityMonitor</string>
+    <string name="app_name">App Monitor</string>
 
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
 </resources>
