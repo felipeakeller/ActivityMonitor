@@ -2,9 +2,12 @@ package com.unisinos.activitymonitor;
 
 import android.app.Activity;
 import android.app.Fragment;
+import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.telephony.TelephonyManager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -14,9 +17,20 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.unisinos.activitymonitor.service.ActionScreenReceiver;
+import com.unisinos.activitymonitor.db.DatabaseHelper;
+import com.unisinos.activitymonitor.domain.ScreenAction;
 import com.unisinos.activitymonitor.service.BackgroundService;
 import com.unisinos.activitymonitor.service.ServiceRunningManagerThread;
+import com.unisinos.activitymonitor.servicedb.ScreenActionService;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.util.Calendar;
+import java.util.List;
 
 public class MainActivity extends Activity {
 
@@ -34,7 +48,9 @@ public class MainActivity extends Activity {
         serviceRunningManager.withImageView((ImageView) findViewById(R.id.imageStatusView));
         serviceRunningManager.start();
 
-       confireButtonsOnScreen();
+        DatabaseHelper.getInstance(getApplicationContext());
+
+        confireButtonsOnScreen();
     }
 
     private void confireButtonsOnScreen() {
@@ -54,22 +70,48 @@ public class MainActivity extends Activity {
             }
         });
 
-//        Button btnInfo = (Button) findViewById(R.id.btn_info);
-//        btnInfo.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//
-//                ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-//                List<ActivityManager.RunningAppProcessInfo> runningAppProcesses = manager.getRunningAppProcesses();
-//                for (ActivityManager.RunningAppProcessInfo info : runningAppProcesses) {
-//                    if(info.processName.contains("service.BackgroundService")) {
-//                        Toast.makeText(MainActivity.this, "Serviço está ativo", Toast.LENGTH_LONG);
-//                        return;
+        Button btnInfo = (Button) findViewById(R.id.btn_info);
+        btnInfo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ScreenActionService screenActionService = ScreenActionService.getInstance(getApplicationContext());
+                List<ScreenAction> allScreenActions = screenActionService.listAll();
+
+                try {
+//                    File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+//                    File file = new File(dir, "screen.txt");
+//                    FileOutputStream outputStream = new FileOutputStream(file);
+//                    for (ScreenAction screenAction : allScreenActions) {
+//                        outputStream.write(screenAction.toString().concat("\n").getBytes());
 //                    }
-//                }
-//                Toast.makeText(MainActivity.this, "Serviço offline", Toast.LENGTH_LONG);
-//            }
-//        });
+//                    outputStream.flush();
+//                    outputStream.close();
+
+//                    File dir = Environment.getExternalStorageDirectory();
+                    File data = Environment.getDataDirectory();
+
+                    String currentDBPath = "//data//com.unisinos.activitymonitor//databases//" + DatabaseHelper.DATA_BASE;
+                    String backupDBPath  = "/BackupFolder/" + DatabaseHelper.DATA_BASE;
+
+                    File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+//                    File file = new File(dir, DatabaseHelper.DATA_BASE);
+
+                    File currentDB = new File(data, currentDBPath);
+                    File backupDB = new File(dir, DatabaseHelper.DATA_BASE);
+//                    backupDB.createNewFile();
+
+                    FileChannel src = new FileInputStream(currentDB).getChannel();
+                    FileChannel dst = new FileOutputStream(backupDB).getChannel();
+                    dst.transferFrom(src, 0, src.size());
+                    src.close();
+                    dst.close();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        });
     }
 
     @Override

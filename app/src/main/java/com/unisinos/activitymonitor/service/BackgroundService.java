@@ -7,6 +7,12 @@ import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.IBinder;
 
+import com.unisinos.activitymonitor.db.DatabaseHelper;
+import com.unisinos.activitymonitor.domain.Device;
+import com.unisinos.activitymonitor.receiver.ActionScreenReceiver;
+import com.unisinos.activitymonitor.servicedb.DeviceService;
+import com.unisinos.activitymonitor.servicedb.ScreenActionService;
+
 public class BackgroundService extends Service {
 
     public static boolean screenOn = true;
@@ -14,6 +20,7 @@ public class BackgroundService extends Service {
     public static Runnable runnable = null;
 
     private ActionScreenReceiver actionScreenReceiver = new ActionScreenReceiver();
+    private ScreenActionService actionScreenService;
 
     public IBinder onBind(Intent intent) {
         return null;
@@ -21,11 +28,21 @@ public class BackgroundService extends Service {
 
     @Override
     public void onCreate() {
+        handler = new Handler();
+
         registerReceiver(actionScreenReceiver, new IntentFilter(Intent.ACTION_SCREEN_ON));
         registerReceiver(actionScreenReceiver, new IntentFilter(Intent.ACTION_SCREEN_OFF));
 
-        handler = new Handler();
-        final RunningAppProcessManager manager = new RunningAppProcessManager();
+        actionScreenService = ScreenActionService.getInstance(getApplicationContext());
+        actionScreenService.registerNewScreenAction();
+
+        actionScreenReceiver.withScreenService(actionScreenService);
+
+        DeviceService deviceService = new DeviceService(getApplicationContext());
+        Device device = deviceService.registerDeviceInfo();
+
+        final RunningAppProcessManager manager = new RunningAppProcessManager(getApplicationContext());
+        manager.withScreenActionService(actionScreenService);
 
         runnable = new Runnable() {
             public void run() {

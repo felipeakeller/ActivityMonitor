@@ -1,84 +1,127 @@
 package com.unisinos.activitymonitor.service;
 
 import android.app.ActivityManager;
+import android.content.Context;
 import android.net.TrafficStats;
-import android.util.Log;
+
+import com.unisinos.activitymonitor.domain.AppInfo;
+import com.unisinos.activitymonitor.servicedb.AppInfoService;
+import com.unisinos.activitymonitor.servicedb.ScreenActionService;
+import com.unisinos.activitymonitor.util.AppProcessInfoTranslator;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 
 public class RunningAppProcessManager {
 
-    final HashMap<String, Integer> map = new HashMap<>();
+    private ScreenActionService screenActionService;
+    private AppInfoService appInfoService;
+    private Context context;
+
+    final HashMap<AppInfoDTO, Integer> map = new HashMap<>();
     final HashMap<Integer, Long> transmitidos = new HashMap<>();
     final HashMap<Integer, Long> recebidos = new HashMap<>();
 
-    public void execute(ActivityManager manager) {
+    public RunningAppProcessManager(Context applicationContext) {
+        this.context = applicationContext;
+    }
 
+    public void execute(ActivityManager manager) {
         List<ActivityManager.RunningAppProcessInfo> runningAppProcesses = manager.getRunningAppProcesses();
 
         for (ActivityManager.RunningAppProcessInfo info : runningAppProcesses) {
 
-            if (map.containsKey(info.processName)) {
-                Integer importance = map.get(info.processName);
+            if (map.containsKey(info.uid)) {
+                Integer importance = map.get(info.uid);
                 if (info.uid != 10008 && !importance.equals(info.importance)) {
-                    showLogApps(info.uid, info.processName, translateImportance(info.importance));
-                    map.put(info.processName, info.importance);
+                    AppInfoDTO appInfoDTO = new AppInfoDTO(info);
+                    registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(info.importance));
+                    map.put(appInfoDTO, info.importance);
                 }
             } else {
-                showLogApps(info.uid, info.processName, translateImportance(info.importance));
-                map.put(info.processName, info.importance);
+                AppInfoDTO appInfoDTO = new AppInfoDTO(info);
+                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(info.importance));
+                map.put(appInfoDTO, info.importance);
             }
 
         }
 
-        List<String> removedProcess = new ArrayList<>();
-        for (String processName : map.keySet()) {
+        verifyRemovedProcess(runningAppProcesses);
+    }
+
+    private void verifyRemovedProcess(List<ActivityManager.RunningAppProcessInfo> runningAppProcesses) {
+        List<AppInfoDTO> removedProcess = new ArrayList<>();
+        for (AppInfoDTO appInfoDTO : map.keySet()) {
             boolean processRunning = false;
             for (ActivityManager.RunningAppProcessInfo appInfo : runningAppProcesses) {
-                if (appInfo.processName.equals(processName)) {
+                if (appInfo.uid == appInfoDTO.uid) {
                     processRunning = true;
                     break;
                 }
             }
             if (!processRunning) {
-                removedProcess.add(processName);
-                showLogApps(0, processName, "REMOVED");
+                removedProcess.add(appInfoDTO);
+                registerAppInfo(appInfoDTO, "REMOVED");
             }
         }
-        for (String processName : removedProcess) {
-            map.remove(processName);
+        for (AppInfoDTO appInfoDTO : removedProcess) {
+            map.remove(appInfoDTO);
         }
-
     }
 
-    private void showLogApps(int uid, String processName, String importance) {
-        Log.i("APPS", String.valueOf(uid) + " | " + processName + " | " + importance + " | ");
-
-        long txAtual = TrafficStats.getUidTxBytes(uid);
-        if(transmitidos.containsKey(uid)) {
-            long tx = transmitidos.get(uid) == null ? 0l : transmitidos.get(uid);
-            Log.i("APPS_NET", processName + " - TX: " + (txAtual - tx));
-        }
-        transmitidos.put(uid, txAtual);
-
-        long rxAtual = TrafficStats.getUidRxBytes(uid);
-        if(recebidos.containsKey(uid)) {
-            long rx = recebidos.get(uid) == null ? 0l : recebidos.get(uid);
-            Log.i("APPS_NET", processName + " - RX: "+ (rxAtual - rx) );
-        }
-        recebidos.put(uid, rxAtual);
+    private void registerAppInfo(AppInfoDTO appInfoDTO, String state) {
+        AppInfo appInfo = new AppInfo();
+        appInfo.setUid(appInfoDTO.uid);
+        appInfo.setProcessName(appInfoDTO.processName);
+        appInfo.setState(state);
+        appInfo.setTxBytes(getTxBytes(appInfoDTO.uid));
+        appInfo.setRxBytes(getRxBytes(appInfoDTO.uid));
+        appInfo.setDate(Calendar.getInstance().getTime());
+        appInfo.setScreenActionId(screenActionService.getScreenAction().getId());
+        appInfoService.save(appInfo);
     }
 
-    private String translateImportance(int importance) {
-        if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) return "FOREGROUND";
-        else if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE) return "PERCEPTIBLE";
-        else if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE) return "VISIBLE";
-        else if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE) return "SERVICE";
-        else if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_BACKGROUND) return "BACKGROUND";
-        else if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_EMPTY) return "EMPTY";
-        return "";
+    private long getRxBytes(int uid) {
+        long currentRxBytes = TrafficStats.getUidRxBytes(uid);
+        long oldRxBytes = transmitidos.get(uid) == null ? 0l : transmitidos.get(uid);
+        recebidos.put(uid, currentRxBytes);
+        return (currentRxBytes - oldRxBytes);
+    }
+
+    private long getTxBytes(int uid) {
+        long currentTxBytes = TrafficStats.getUidTxBytes(uid);
+        long oldTxBytes = transmitidos.get(uid) == null ? 0l : transmitidos.get(uid);
+        transmitidos.put(uid, currentTxBytes);
+        return (currentTxBytes - oldTxBytes);
+    }
+
+    public void withScreenActionService(ScreenActionService screenActionService) {
+        this.screenActionService = screenActionService;
+    }
+
+    class AppInfoDTO {
+        String processName;
+        int uid;
+
+        AppInfoDTO(ActivityManager.RunningAppProcessInfo info) {
+            this.uid = info.uid;
+            this.processName = info.processName;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            AppInfoDTO that = (AppInfoDTO) o;
+            return uid == that.uid;
+        }
+
+        @Override
+        public int hashCode() {
+            return uid;
+        }
     }
 
 }
