@@ -2,16 +2,22 @@ package com.unisinos.activitymonitor.service;
 
 import android.app.ActivityManager;
 import android.app.Service;
+import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.IBinder;
+import android.util.Log;
 
-import com.unisinos.activitymonitor.db.DatabaseHelper;
 import com.unisinos.activitymonitor.domain.Device;
 import com.unisinos.activitymonitor.receiver.ActionScreenReceiver;
 import com.unisinos.activitymonitor.servicedb.DeviceService;
 import com.unisinos.activitymonitor.servicedb.ScreenActionService;
+
+import java.util.List;
 
 public class BackgroundService extends Service {
 
@@ -44,11 +50,19 @@ public class BackgroundService extends Service {
         final RunningAppProcessManager manager = new RunningAppProcessManager(getApplicationContext());
         manager.withScreenActionService(actionScreenService);
 
+        ActivityManager activityManager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
+        List<ApplicationInfo> installedApplications = getApplicationContext().getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
+        manager.installedApplications(installedApplications);
+
         runnable = new Runnable() {
             public void run() {
                 if(screenOn) {
-                    manager.execute((ActivityManager) BackgroundService.this.getSystemService(ACTIVITY_SERVICE));
-                    handler.postDelayed(runnable, 1500);
+                    UsageStatsManager usage = (UsageStatsManager)BackgroundService.this.getSystemService(USAGE_STATS_SERVICE);
+                    long time = System.currentTimeMillis();
+                    UsageEvents usageEvents = usage.queryEvents(time - 2000, time);
+
+                    manager.execute(usageEvents);
+                    handler.postDelayed(runnable, 1200);
                 } else {
                     handler.postDelayed(runnable, 2000);
                 }

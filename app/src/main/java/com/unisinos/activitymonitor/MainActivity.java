@@ -16,6 +16,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.unisinos.activitymonitor.db.DatabaseHelper;
 import com.unisinos.activitymonitor.domain.ScreenAction;
@@ -98,6 +99,10 @@ public class MainActivity extends Activity {
 
                     File currentDB = new File(data, currentDBPath);
                     File backupDB = new File(dir, DatabaseHelper.DATA_BASE);
+
+                    if(backupDB.exists()) {
+                        backupDB.delete();
+                    }
 //                    backupDB.createNewFile();
 
                     FileChannel src = new FileInputStream(currentDB).getChannel();
@@ -105,6 +110,8 @@ public class MainActivity extends Activity {
                     dst.transferFrom(src, 0, src.size());
                     src.close();
                     dst.close();
+
+                    Toast.makeText(MainActivity.this, "Exportado - " +backupDB.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
                 } catch (IOException e) {
                     e.printStackTrace();

@@ -1,8 +1,10 @@
 package com.unisinos.activitymonitor.service;
 
-import android.app.ActivityManager;
+import android.app.usage.UsageEvents;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.net.TrafficStats;
+import android.util.Log;
 
 import com.unisinos.activitymonitor.domain.AppInfo;
 import com.unisinos.activitymonitor.servicedb.AppInfoService;
@@ -13,71 +15,80 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RunningAppProcessManager {
 
+    private Context context;
     private ScreenActionService screenActionService;
     private AppInfoService appInfoService;
-    private Context context;
 
-    final HashMap<AppInfoDTO, Integer> map = new HashMap<>();
-    final HashMap<Integer, Long> transmitidos = new HashMap<>();
-    final HashMap<Integer, Long> recebidos = new HashMap<>();
+    Map<String, Integer> installedApplicationsMap = new HashMap<>();
+    final Map<String, AppInfoDTO> map = new HashMap<>();
+    final Map<Integer, Long> transmitidos = new HashMap<>();
+    final Map<Integer, Long> recebidos = new HashMap<>();
 
     public RunningAppProcessManager(Context applicationContext) {
         this.context = applicationContext;
+        this.appInfoService = new AppInfoService(applicationContext);
     }
 
-    public void execute(ActivityManager manager) {
-        List<ActivityManager.RunningAppProcessInfo> runningAppProcesses = manager.getRunningAppProcesses();
+    public void execute(UsageEvents usageEvents) {
 
-        for (ActivityManager.RunningAppProcessInfo info : runningAppProcesses) {
-
-            if (map.containsKey(info.uid)) {
-                Integer importance = map.get(info.uid);
-                if (info.uid != 10008 && !importance.equals(info.importance)) {
-                    AppInfoDTO appInfoDTO = new AppInfoDTO(info);
-                    registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(info.importance));
-                    map.put(appInfoDTO, info.importance);
-                }
-            } else {
-                AppInfoDTO appInfoDTO = new AppInfoDTO(info);
-                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(info.importance));
-                map.put(appInfoDTO, info.importance);
-            }
-
+        List<UsageEvents.Event> currentEvents = new ArrayList<>();
+        while(usageEvents.hasNextEvent()) {
+            UsageEvents.Event event = new UsageEvents.Event();
+            usageEvents.getNextEvent(event);
+            currentEvents.add(event);
         }
 
-        verifyRemovedProcess(runningAppProcesses);
+        for (UsageEvents.Event event : currentEvents) {
+            if("com.android.systemui".equals(event.getPackageName())) {
+                continue;
+            }
+            if (map.containsKey(event.getPackageName())) {
+                int eventType = map.get(event.getPackageName()).eventType;
+                if (eventType != event.getEventType()) {
+                    AppInfoDTO appInfoDTO = new AppInfoDTO(event);
+                    registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(event.getEventType()));
+                    map.put(event.getPackageName(), appInfoDTO);
+                }
+            } else {
+                AppInfoDTO appInfoDTO = new AppInfoDTO(event);
+                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(event.getEventType()));
+                map.put(event.getPackageName(), appInfoDTO);
+            }
+        }
+//        verifyRemovedProcess(currentEvents);
     }
 
-    private void verifyRemovedProcess(List<ActivityManager.RunningAppProcessInfo> runningAppProcesses) {
-        List<AppInfoDTO> removedProcess = new ArrayList<>();
-        for (AppInfoDTO appInfoDTO : map.keySet()) {
+    private void verifyRemovedProcess(List<UsageEvents.Event> events) {
+        List<String> removedProcess = new ArrayList<>();
+        for (String packageName : map.keySet()) {
             boolean processRunning = false;
-            for (ActivityManager.RunningAppProcessInfo appInfo : runningAppProcesses) {
-                if (appInfo.uid == appInfoDTO.uid) {
+            for (UsageEvents.Event event : events) {
+                if (event.getPackageName().equals(packageName)) {
                     processRunning = true;
                     break;
                 }
             }
             if (!processRunning) {
-                removedProcess.add(appInfoDTO);
-                registerAppInfo(appInfoDTO, "REMOVED");
+                removedProcess.add(packageName);
+                registerAppInfo(map.get(packageName), "REMOVED");
             }
         }
-        for (AppInfoDTO appInfoDTO : removedProcess) {
-            map.remove(appInfoDTO);
+        for (String packageName : removedProcess) {
+            map.remove(packageName);
         }
     }
 
     private void registerAppInfo(AppInfoDTO appInfoDTO, String state) {
         AppInfo appInfo = new AppInfo();
-        appInfo.setUid(appInfoDTO.uid);
-        appInfo.setProcessName(appInfoDTO.processName);
+        appInfo.setUid(installedApplicationsMap.get(appInfoDTO.packageName));
+        appInfo.setProcessName(appInfoDTO.packageName);
         appInfo.setState(state);
-        appInfo.setTxBytes(getTxBytes(appInfoDTO.uid));
-        appInfo.setRxBytes(getRxBytes(appInfoDTO.uid));
+        appInfo.setTxBytes(getTxBytes(appInfo.getUid()));
+        appInfo.setRxBytes(getRxBytes(appInfo.getUid()));
         appInfo.setDate(Calendar.getInstance().getTime());
         appInfo.setScreenActionId(screenActionService.getScreenAction().getId());
         appInfoService.save(appInfo);
@@ -85,7 +96,7 @@ public class RunningAppProcessManager {
 
     private long getRxBytes(int uid) {
         long currentRxBytes = TrafficStats.getUidRxBytes(uid);
-        long oldRxBytes = transmitidos.get(uid) == null ? 0l : transmitidos.get(uid);
+        long oldRxBytes = recebidos.get(uid) == null ? 0l : recebidos.get(uid);
         recebidos.put(uid, currentRxBytes);
         return (currentRxBytes - oldRxBytes);
     }
@@ -101,13 +112,21 @@ public class RunningAppProcessManager {
         this.screenActionService = screenActionService;
     }
 
-    class AppInfoDTO {
-        String processName;
-        int uid;
+    public void installedApplications(List<ApplicationInfo> installedApplications) {
+        if(installedApplicationsMap.size() != installedApplications.size()) {
+            for (ApplicationInfo applicationInfo : installedApplications) {
+                installedApplicationsMap.put(applicationInfo.packageName, applicationInfo.uid);
+            }
+        }
+    }
 
-        AppInfoDTO(ActivityManager.RunningAppProcessInfo info) {
-            this.uid = info.uid;
-            this.processName = info.processName;
+    class AppInfoDTO {
+        String packageName;
+        int eventType;
+
+        AppInfoDTO(UsageEvents.Event event) {
+            this.packageName = event.getPackageName();
+            this.eventType = event.getEventType();
         }
 
         @Override
@@ -115,12 +134,12 @@ public class RunningAppProcessManager {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             AppInfoDTO that = (AppInfoDTO) o;
-            return uid == that.uid;
+            return packageName.equals(that.packageName);
         }
 
         @Override
         public int hashCode() {
-            return uid;
+            return packageName.hashCode();
         }
     }
 

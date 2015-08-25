@@ -13,6 +13,7 @@ public class AppInfoDbHelper {
         StringBuilder sqlCreateDevice = new StringBuilder();
         sqlCreateDevice.append(" CREATE TABLE ").append(AppInfo.TABLE_NAME).append(" ( ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_ID).append(" INTEGER PRIMARY KEY AUTOINCREMENT, ");
+        sqlCreateDevice.append(AppInfo.COLUMN_NAME_UID).append(" INTEGER, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_PROCESS_NAME).append(" TEXT, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_STATE).append(" TEXT, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_TX_BYTES).append(" INTEGER, ");
