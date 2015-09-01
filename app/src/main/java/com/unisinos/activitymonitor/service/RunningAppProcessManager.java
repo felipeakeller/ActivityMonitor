@@ -4,7 +4,6 @@ import android.app.usage.UsageEvents;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.net.TrafficStats;
-import android.util.Log;
 
 import com.unisinos.activitymonitor.domain.AppInfo;
 import com.unisinos.activitymonitor.servicedb.AppInfoService;
@@ -59,27 +58,6 @@ public class RunningAppProcessManager {
                 map.put(event.getPackageName(), appInfoDTO);
             }
         }
-//        verifyRemovedProcess(currentEvents);
-    }
-
-    private void verifyRemovedProcess(List<UsageEvents.Event> events) {
-        List<String> removedProcess = new ArrayList<>();
-        for (String packageName : map.keySet()) {
-            boolean processRunning = false;
-            for (UsageEvents.Event event : events) {
-                if (event.getPackageName().equals(packageName)) {
-                    processRunning = true;
-                    break;
-                }
-            }
-            if (!processRunning) {
-                removedProcess.add(packageName);
-                registerAppInfo(map.get(packageName), "REMOVED");
-            }
-        }
-        for (String packageName : removedProcess) {
-            map.remove(packageName);
-        }
     }
 
     private void registerAppInfo(AppInfoDTO appInfoDTO, String state) {
@@ -96,16 +74,26 @@ public class RunningAppProcessManager {
 
     private long getRxBytes(int uid) {
         long currentRxBytes = TrafficStats.getUidRxBytes(uid);
-        long oldRxBytes = recebidos.get(uid) == null ? 0l : recebidos.get(uid);
-        recebidos.put(uid, currentRxBytes);
-        return (currentRxBytes - oldRxBytes);
+        if(recebidos.get(uid) == null) {
+            recebidos.put(uid, currentRxBytes);
+            return 0l;
+        } else {
+            long oldRxBytes = recebidos.get(uid);
+            recebidos.put(uid, currentRxBytes);
+            return (currentRxBytes - oldRxBytes);
+        }
     }
 
     private long getTxBytes(int uid) {
         long currentTxBytes = TrafficStats.getUidTxBytes(uid);
-        long oldTxBytes = transmitidos.get(uid) == null ? 0l : transmitidos.get(uid);
-        transmitidos.put(uid, currentTxBytes);
-        return (currentTxBytes - oldTxBytes);
+        if(transmitidos.get(uid) == null) {
+            transmitidos.put(uid, currentTxBytes);
+            return 0l;
+        } else {
+            long oldTxBytes = transmitidos.get(uid);
+            transmitidos.put(uid, currentTxBytes);
+            return (currentTxBytes - oldTxBytes);
+        }
     }
 
     public void withScreenActionService(ScreenActionService screenActionService) {

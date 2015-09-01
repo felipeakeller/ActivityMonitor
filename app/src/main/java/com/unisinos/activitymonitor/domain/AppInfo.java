@@ -3,6 +3,7 @@ package com.unisinos.activitymonitor.domain;
 import android.content.ContentValues;
 import android.database.Cursor;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -88,18 +89,20 @@ public class AppInfo {
     }
 
     public ContentValues toContentValues() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
         ContentValues contentValues = new ContentValues();
         contentValues.put(COLUMN_NAME_UID, getUid());
         contentValues.put(COLUMN_NAME_PROCESS_NAME, getProcessName());
         contentValues.put(COLUMN_NAME_STATE, getState());
         contentValues.put(COLUMN_NAME_TX_BYTES, getTxBytes());
         contentValues.put(COLUMN_NAME_RX_BYTES, getRxBytes());
-        contentValues.put(COLUMN_NAME_DATE, getDate().getTime());
+        contentValues.put(COLUMN_NAME_DATE, sdf.format(getDate()));
         contentValues.put(COLUMN_NAME_SCREEN_ACTION_ID, getScreenActionId());
         return contentValues;
     }
 
     public static AppInfo fromCursor(Cursor cursor) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
         AppInfo appInfo = new AppInfo();
         appInfo.setId(cursor.getLong(cursor.getColumnIndex(COLUMN_NAME_ID)));
         appInfo.setUid(cursor.getInt(cursor.getColumnIndex(COLUMN_NAME_UID)));
@@ -107,7 +110,12 @@ public class AppInfo {
         appInfo.setState(cursor.getString(cursor.getColumnIndex(COLUMN_NAME_STATE)));
         appInfo.setTxBytes(cursor.getLong(cursor.getColumnIndex(COLUMN_NAME_TX_BYTES)));
         appInfo.setRxBytes(cursor.getLong(cursor.getColumnIndex(COLUMN_NAME_RX_BYTES)));
-        appInfo.setDate(new Date(cursor.getLong(cursor.getColumnIndex(COLUMN_NAME_DATE))));
+        try {
+            String columnDate = cursor.getString(cursor.getColumnIndex(COLUMN_NAME_DATE));
+            appInfo.setDate(columnDate == null ? null : sdf.parse(columnDate));
+        } catch (ParseException e) {
+            appInfo.setDate(null);
+        }
         appInfo.setScreenActionId(cursor.getInt(cursor.getColumnIndex(COLUMN_NAME_SCREEN_ACTION_ID)));
         return appInfo;
     }

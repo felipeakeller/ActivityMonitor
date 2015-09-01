@@ -1,4 +1,4 @@
-package com.unisinos.activitymonitor.service;
+package com.unisinos.activitymonitor.ui;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -7,7 +7,9 @@ import android.content.Context;
 import android.os.SystemClock;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import com.unisinos.activitymonitor.R;
+
 import java.util.concurrent.TimeUnit;
 
 /**

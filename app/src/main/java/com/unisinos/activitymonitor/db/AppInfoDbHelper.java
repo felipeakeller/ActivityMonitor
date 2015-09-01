@@ -1,7 +1,6 @@
 package com.unisinos.activitymonitor.db;
 
 import com.unisinos.activitymonitor.domain.AppInfo;
-import com.unisinos.activitymonitor.domain.Device;
 import com.unisinos.activitymonitor.domain.ScreenAction;
 
 /**
@@ -18,7 +17,7 @@ public class AppInfoDbHelper {
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_STATE).append(" TEXT, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_TX_BYTES).append(" INTEGER, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_RX_BYTES).append(" INTEGER, ");
-        sqlCreateDevice.append(AppInfo.COLUMN_NAME_DATE).append(" INTEGER, ");
+        sqlCreateDevice.append(AppInfo.COLUMN_NAME_DATE).append(" TEXT, ");
         sqlCreateDevice.append(AppInfo.COLUMN_NAME_SCREEN_ACTION_ID).append(" INTEGER, ");
         sqlCreateDevice.append(" FOREIGN KEY ( " + AppInfo.COLUMN_NAME_SCREEN_ACTION_ID + " ) ");
         sqlCreateDevice.append(" REFERENCES " + ScreenAction.TABLE_NAME + "(" + ScreenAction.COLUMN_NAME_ID +") )");

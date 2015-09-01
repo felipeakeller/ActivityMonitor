@@ -10,7 +10,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.IBinder;
-import android.util.Log;
 
 import com.unisinos.activitymonitor.domain.Device;
 import com.unisinos.activitymonitor.receiver.ActionScreenReceiver;
@@ -62,7 +61,8 @@ public class BackgroundService extends Service {
                     UsageEvents usageEvents = usage.queryEvents(time - 2000, time);
 
                     manager.execute(usageEvents);
-                    handler.postDelayed(runnable, 1200);
+
+                    handler.postDelayed(runnable, 1000);
                 } else {
                     handler.postDelayed(runnable, 2000);
                 }
