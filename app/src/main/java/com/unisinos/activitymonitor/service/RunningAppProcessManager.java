@@ -3,6 +3,7 @@ package com.unisinos.activitymonitor.service;
 import android.app.usage.UsageEvents;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.TrafficStats;
 
 import com.unisinos.activitymonitor.domain.AppInfo;
@@ -62,6 +63,10 @@ public class RunningAppProcessManager {
 
     private void registerAppInfo(AppInfoDTO appInfoDTO, String state) {
         AppInfo appInfo = new AppInfo();
+
+        if(!installedApplicationsMap.containsKey(appInfoDTO.packageName)) {
+            refreshInstalledApplications();
+        }
         appInfo.setUid(installedApplicationsMap.get(appInfoDTO.packageName));
         appInfo.setProcessName(appInfoDTO.packageName);
         appInfo.setState(state);
@@ -100,11 +105,10 @@ public class RunningAppProcessManager {
         this.screenActionService = screenActionService;
     }
 
-    public void installedApplications(List<ApplicationInfo> installedApplications) {
-        if(installedApplicationsMap.size() != installedApplications.size()) {
-            for (ApplicationInfo applicationInfo : installedApplications) {
-                installedApplicationsMap.put(applicationInfo.packageName, applicationInfo.uid);
-            }
+    public void refreshInstalledApplications() {
+        List<ApplicationInfo> installedApplications = context.getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
+        for (ApplicationInfo applicationInfo : installedApplications) {
+            installedApplicationsMap.put(applicationInfo.packageName, applicationInfo.uid);
         }
     }
 

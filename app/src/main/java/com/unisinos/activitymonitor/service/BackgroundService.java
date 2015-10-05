@@ -1,13 +1,10 @@
 package com.unisinos.activitymonitor.service;
 
-import android.app.ActivityManager;
 import android.app.Service;
 import android.app.usage.UsageEvents;
 import android.app.usage.UsageStatsManager;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.IBinder;
 
@@ -15,8 +12,6 @@ import com.unisinos.activitymonitor.domain.Device;
 import com.unisinos.activitymonitor.receiver.ActionScreenReceiver;
 import com.unisinos.activitymonitor.servicedb.DeviceService;
 import com.unisinos.activitymonitor.servicedb.ScreenActionService;
-
-import java.util.List;
 
 public class BackgroundService extends Service {
 
@@ -48,10 +43,7 @@ public class BackgroundService extends Service {
 
         final RunningAppProcessManager manager = new RunningAppProcessManager(getApplicationContext());
         manager.withScreenActionService(actionScreenService);
-
-        ActivityManager activityManager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
-        List<ApplicationInfo> installedApplications = getApplicationContext().getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
-        manager.installedApplications(installedApplications);
+        manager.refreshInstalledApplications();
 
         runnable = new Runnable() {
             public void run() {
