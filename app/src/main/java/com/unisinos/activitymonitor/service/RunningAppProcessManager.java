@@ -1,17 +1,17 @@
 package com.unisinos.activitymonitor.service;
 
-import android.app.usage.UsageEvents;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.TrafficStats;
+import android.util.Log;
 
 import com.unisinos.activitymonitor.domain.AppInfo;
 import com.unisinos.activitymonitor.servicedb.AppInfoService;
 import com.unisinos.activitymonitor.servicedb.ScreenActionService;
 import com.unisinos.activitymonitor.util.AppProcessInfoTranslator;
 
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
@@ -33,30 +33,47 @@ public class RunningAppProcessManager {
         this.appInfoService = new AppInfoService(applicationContext);
     }
 
-    public void execute(UsageEvents usageEvents) {
+    public void execute(ActivityManager manager) {
 
-        List<UsageEvents.Event> currentEvents = new ArrayList<>();
-        while(usageEvents.hasNextEvent()) {
-            UsageEvents.Event event = new UsageEvents.Event();
-            usageEvents.getNextEvent(event);
-            currentEvents.add(event);
+        List<ActivityManager.RunningAppProcessInfo> runningAppProcesses = manager.getRunningAppProcesses();
+
+        for (ActivityManager.RunningAppProcessInfo info : runningAppProcesses) {
+
+            if (map.containsKey(info.processName)) {
+                if("com.android.systemui".equals(info.processName)) {
+                    continue;
+                }
+                int eventType = map.get(info.processName).eventType;
+                AppInfoDTO appInfoDTO = new AppInfoDTO(info);
+                if (eventType != appInfoDTO.eventType) {
+                    registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(appInfoDTO.eventType));
+                    map.put(info.processName, appInfoDTO);
+                }
+            } else if(ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND == info.importance){
+                AppInfoDTO appInfoDTO = new AppInfoDTO(info);
+                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(appInfoDTO.eventType));
+                map.put(info.processName, appInfoDTO);
+            }
+
         }
 
-        for (UsageEvents.Event event : currentEvents) {
-            if("com.android.systemui".equals(event.getPackageName())) {
-                continue;
-            }
-            if (map.containsKey(event.getPackageName())) {
-                int eventType = map.get(event.getPackageName()).eventType;
-                if (eventType != event.getEventType()) {
-                    AppInfoDTO appInfoDTO = new AppInfoDTO(event);
-                    registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(event.getEventType()));
-                    map.put(event.getPackageName(), appInfoDTO);
+        verifyRemovedProcess(runningAppProcesses);
+    }
+
+    private void verifyRemovedProcess(List<ActivityManager.RunningAppProcessInfo> runningAppProcesses) {
+        for (String processName : map.keySet()) {
+            boolean processRunning = false;
+            for (ActivityManager.RunningAppProcessInfo appInfo : runningAppProcesses) {
+                if (appInfo.processName.equals(processName)) {
+                    processRunning = true;
+                    break;
                 }
-            } else {
-                AppInfoDTO appInfoDTO = new AppInfoDTO(event);
-                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(event.getEventType()));
-                map.put(event.getPackageName(), appInfoDTO);
+            }
+            if (!processRunning) {
+                AppInfoDTO appInfoDTO = map.get(processName);
+                appInfoDTO.eventType = AppProcessInfoTranslator.backgroundState();
+                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(appInfoDTO.eventType));
+                map.put(appInfoDTO.packageName, appInfoDTO);
             }
         }
     }
@@ -67,6 +84,10 @@ public class RunningAppProcessManager {
         if(!installedApplicationsMap.containsKey(appInfoDTO.packageName)) {
             refreshInstalledApplications();
         }
+        if(!installedApplicationsMap.containsKey(appInfoDTO.packageName)) {
+            return;
+        }
+        Log.i("INFO", appInfoDTO.packageName);
         appInfo.setUid(installedApplicationsMap.get(appInfoDTO.packageName));
         appInfo.setProcessName(appInfoDTO.packageName);
         appInfo.setState(state);
@@ -112,13 +133,23 @@ public class RunningAppProcessManager {
         }
     }
 
+    public void updateAppToBackground() {
+        for(AppInfoDTO appInfoDTO : map.values()) {
+            if(appInfoDTO.eventType != AppProcessInfoTranslator.backgroundState()) {
+                appInfoDTO.eventType = AppProcessInfoTranslator.backgroundState();
+                registerAppInfo(appInfoDTO, AppProcessInfoTranslator.translate(appInfoDTO.eventType));
+                map.put(appInfoDTO.packageName, appInfoDTO);
+            }
+        }
+    }
+
     class AppInfoDTO {
         String packageName;
         int eventType;
 
-        AppInfoDTO(UsageEvents.Event event) {
-            this.packageName = event.getPackageName();
-            this.eventType = event.getEventType();
+        AppInfoDTO(ActivityManager.RunningAppProcessInfo info) {
+            this.packageName = info.processName;
+            this.eventType = AppProcessInfoTranslator.getEventType(info.importance);
         }
 
         @Override

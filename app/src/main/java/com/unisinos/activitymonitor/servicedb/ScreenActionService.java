@@ -4,10 +4,10 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
 
 import com.unisinos.activitymonitor.db.DatabaseHelper;
 import com.unisinos.activitymonitor.domain.ScreenAction;
+import com.unisinos.activitymonitor.service.BackgroundService;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -34,7 +34,7 @@ public class ScreenActionService {
         if(statusChanged) {
 
             screenOn = screenActualStatus;
-
+            BackgroundService.screenOn = screenOn;
             if(screenActualStatus) {
                 registerNewScreenAction();
             } else {

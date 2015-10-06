@@ -1,8 +1,7 @@
 package com.unisinos.activitymonitor.service;
 
+import android.app.ActivityManager;
 import android.app.Service;
-import android.app.usage.UsageEvents;
-import android.app.usage.UsageStatsManager;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
@@ -48,15 +47,11 @@ public class BackgroundService extends Service {
         runnable = new Runnable() {
             public void run() {
                 if(screenOn) {
-                    UsageStatsManager usage = (UsageStatsManager)BackgroundService.this.getSystemService(USAGE_STATS_SERVICE);
-                    long time = System.currentTimeMillis();
-                    UsageEvents usageEvents = usage.queryEvents(time - 2000, time);
-
-                    manager.execute(usageEvents);
-
+                    manager.execute((ActivityManager) BackgroundService.this.getSystemService(ACTIVITY_SERVICE));
                     handler.postDelayed(runnable, 1000);
                 } else {
-                    handler.postDelayed(runnable, 2000);
+                    manager.updateAppToBackground();
+                    handler.postDelayed(runnable, 1000);
                 }
             }
         };

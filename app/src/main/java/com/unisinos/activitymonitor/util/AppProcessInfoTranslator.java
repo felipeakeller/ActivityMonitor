@@ -11,12 +11,26 @@ public class AppProcessInfoTranslator {
     public static String translate(int importance) {
 
         switch(importance) {
-            case UsageEvents.Event.MOVE_TO_BACKGROUND : return "BACKGROUND";
-            case UsageEvents.Event.MOVE_TO_FOREGROUND : return "FOREGROUND";
+            case 1 : return "FOREGROUND";
+            case 2 : return "BACKGROUND";
             case UsageEvents.Event.NONE : return "NONE";
         }
         return "";
 
     }
 
+    public static int getEventType(int importance) {
+        if(importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+            return 1;
+        }
+        return 2;
+    }
+
+    public static String background() {
+        return "BACKGROUND";
+    }
+
+    public static int backgroundState() {
+        return 2;
+    }
 }
